@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # =================================================================
+  # PostgreSQL 16 + PostGIS 3.4 (Geospatial Relational Database)
+  # =================================================================
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: supermarket_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: supermarket_pricing_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-postgis.sql:/docker-entrypoint-initdb.d/init-postgis.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d supermarket_pricing_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =================================================================
+  # Redis 7 (Caching, Rate Limiting & BullMQ Queues)
+  # =================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: supermarket_redis
+    restart: always
+    command: redis-server --requirepass redispassword
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redispassword", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =================================================================
+  # Elasticsearch 8.11 (Full-Text Search & Semantic Product Catalog)
+  # =================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    container_name: supermarket_elasticsearch
+    restart: always
+    environment:
+      - node.name=es01
+      - cluster.name=supermarket-cluster
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'status.*green\\|yellow'"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+  es_data:

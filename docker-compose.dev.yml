@@ -1,0 +1,80 @@
+# Docker Compose para DESARROLLO — levanta todo el stack de una sola vez.
+#
+#   docker compose -f docker-compose.dev.yml up --build
+#
+# Servicios:
+#   - postgres  : PostgreSQL 16 + PostGIS 3.4 (con healthcheck)
+#   - backend   : NestJS en modo watch, puerto 3000 (instala deps, corre seed y arranca)
+#   - frontend  : Next.js en modo dev, puerto 3001
+#
+# Nota: el seed es idempotente (omite si ya hay datos), por eso es seguro en cada arranque.
+# Para detener y borrar datos:  docker compose -f docker-compose.dev.yml down -v
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: supermarket_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: supermarket_pricing_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./init-postgis.sql:/docker-entrypoint-initdb.d/init-postgis.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d supermarket_pricing_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: supermarket_backend_dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      API_PREFIX: api/v1
+      CORS_ORIGINS: http://localhost:3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgrespassword
+      DB_NAME: supermarket_pricing_db
+      DB_SYNCHRONIZE: "false"
+      DB_LOGGING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    # Instala dependencias, crea el esquema + datos de prueba (idempotente) y arranca en watch.
+    command: sh -c "npm install && npm run seed && npm run start:dev"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: supermarket_frontend_dev
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3000/api/v1
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev"
+
+volumes:
+  postgres_dev_data:

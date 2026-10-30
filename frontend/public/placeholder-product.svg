@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-label="Producto sin imagen">
+  <rect width="160" height="160" fill="#1e293b" />
+  <g fill="none" stroke="#475569" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M56 62h48l-5 58a6 6 0 0 1-6 5H67a6 6 0 0 1-6-5z" />
+    <path d="M68 62V46a12 12 0 0 1 24 0v16" />
+  </g>
+  <text x="80" y="146" font-family="system-ui, sans-serif" font-size="11" fill="#64748b" text-anchor="middle">
+    sin imagen
+  </text>
+</svg>

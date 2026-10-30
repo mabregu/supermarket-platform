@@ -1,0 +1,28 @@
+# Render Blueprint (plan free) para el backend de Supermarket Platform.
+# Uso:
+#   1. Crear un Web Service en Render desde este repo (o usar "New > Blueprint").
+#   2. Render detecta el runtime `node` y el rootDir `backend`.
+#   3. Setear en el dashboard las variables de entorno (o completar envVars abajo).
+#   4. Correr migraciones una sola vez (Render Shell): `npm run migration:run`.
+services:
+  - type: web
+    name: supermarket-platform-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    autoDeploy: true
+    # (No hay endpoint de health: se omite el healthCheckPath para no marcar el
+    #  servicio como unhealthy con un 404.)
+    # Variables de entorno (completar los valores en el dashboard de Render).
+    # env:
+    #   - key: DATABASE_URL
+    #     value: postgres://user:pass@host:5432/dbname
+    #     sync: false
+    #   - key: PORT
+    #     value: 8080
+    #     sync: false
+    #   - key: CORS_ORIGINS
+    #     value: https://your-frontend.vercel.app
+    #     sync: false

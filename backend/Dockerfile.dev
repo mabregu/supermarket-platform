@@ -1,0 +1,15 @@
+# Imagen de desarrollo para el backend NestJS (hot reload con nest start --watch).
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Instalar dependencias primero para aprovechar la caché de capas.
+COPY package*.json ./
+RUN npm install
+
+# El código se monta como volumen en docker-compose.dev.yml (para el watch).
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "run", "start:dev"]
