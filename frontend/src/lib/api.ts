@@ -124,6 +124,19 @@ export function haversineKm(
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+export interface StorePriceDeal {
+  branchId: string;
+  supermarketName: string;
+  branchName: string;
+  address: string;
+  price: number;
+  listPrice?: number | null;
+  hasPromotion?: boolean;
+  unitPrice: number;
+  distanceKm: number;
+  lastUpdated?: string | Date;
+}
+
 export const MOCK_PRODUCTS = [
   {
     productId: 'p1',
@@ -141,10 +154,47 @@ export const MOCK_PRODUCTS = [
       branchName: 'Día % Sucursal Obelisco',
       address: 'Av. Corrientes 1050',
       price: 1090.0,
+      listPrice: 1250.0,
+      hasPromotion: true,
       unitPrice: 1090.0,
       distanceKm: 2.1,
       lastUpdated: new Date().toISOString(),
     },
+    storePrices: [
+      {
+        branchId: 'b3',
+        supermarketName: 'Supermercados Día',
+        branchName: 'Día % Sucursal Obelisco',
+        address: 'Av. Corrientes 1050',
+        price: 1090.0,
+        listPrice: 1250.0,
+        hasPromotion: true,
+        unitPrice: 1090.0,
+        distanceKm: 2.1,
+      },
+      {
+        branchId: 'b1',
+        supermarketName: 'Carrefour Argentina',
+        branchName: 'Carrefour Express San Telmo',
+        address: 'Av. Paseo Colón 500',
+        price: 1120.0,
+        listPrice: null,
+        hasPromotion: false,
+        unitPrice: 1120.0,
+        distanceKm: 1.8,
+      },
+      {
+        branchId: 'b2',
+        supermarketName: 'Coto C.I.C.S.A.',
+        branchName: 'Coto Sucursal 60 - Abasto',
+        address: 'Av. Corrientes 3247',
+        price: 1250.0,
+        listPrice: null,
+        hasPromotion: false,
+        unitPrice: 1250.0,
+        distanceKm: 2.6,
+      },
+    ],
     priceRange: { min: 1090.0, max: 1250.0, average: 1153.33 },
   },
   {
@@ -163,10 +213,47 @@ export const MOCK_PRODUCTS = [
       branchName: 'Coto Sucursal 60 - Abasto',
       address: 'Av. Corrientes 3247',
       price: 2290.0,
+      listPrice: 2450.0,
+      hasPromotion: true,
       unitPrice: 1526.66,
       distanceKm: 1.4,
       lastUpdated: new Date().toISOString(),
     },
+    storePrices: [
+      {
+        branchId: 'b2',
+        supermarketName: 'Coto C.I.C.S.A.',
+        branchName: 'Coto Sucursal 60 - Abasto',
+        address: 'Av. Corrientes 3247',
+        price: 2290.0,
+        listPrice: 2450.0,
+        hasPromotion: true,
+        unitPrice: 1526.66,
+        distanceKm: 1.4,
+      },
+      {
+        branchId: 'b3',
+        supermarketName: 'Supermercados Día',
+        branchName: 'Día % Sucursal Obelisco',
+        address: 'Av. Corrientes 1050',
+        price: 2380.0,
+        listPrice: null,
+        hasPromotion: false,
+        unitPrice: 1586.66,
+        distanceKm: 2.1,
+      },
+      {
+        branchId: 'b1',
+        supermarketName: 'Carrefour Argentina',
+        branchName: 'Carrefour Express San Telmo',
+        address: 'Av. Paseo Colón 500',
+        price: 2450.0,
+        listPrice: null,
+        hasPromotion: false,
+        unitPrice: 1633.33,
+        distanceKm: 1.8,
+      },
+    ],
     priceRange: { min: 2290.0, max: 2450.0, average: 2373.33 },
   },
   {
@@ -185,10 +272,36 @@ export const MOCK_PRODUCTS = [
       branchName: 'Coto Sucursal 60 - Abasto',
       address: 'Av. Corrientes 3247',
       price: 2850.0,
+      listPrice: null,
+      hasPromotion: false,
       unitPrice: 1266.66,
       distanceKm: 1.4,
       lastUpdated: new Date().toISOString(),
     },
+    storePrices: [
+      {
+        branchId: 'b2',
+        supermarketName: 'Coto C.I.C.S.A.',
+        branchName: 'Coto Sucursal 60 - Abasto',
+        address: 'Av. Corrientes 3247',
+        price: 2850.0,
+        listPrice: null,
+        hasPromotion: false,
+        unitPrice: 1266.66,
+        distanceKm: 1.4,
+      },
+      {
+        branchId: 'b3',
+        supermarketName: 'Supermercados Día',
+        branchName: 'Día % Sucursal Obelisco',
+        address: 'Av. Corrientes 1050',
+        price: 2990.0,
+        listPrice: null,
+        hasPromotion: false,
+        unitPrice: 1328.88,
+        distanceKm: 2.1,
+      },
+    ],
     priceRange: { min: 2850.0, max: 2990.0, average: 2920.0 },
   },
 ];

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { X, Sparkles, ShoppingBag, ArrowRight, Route, ShieldCheck, TrendingDown, Trash2, Plus, Minus } from 'lucide-react';
+import { X, Sparkles, ShoppingBag, ArrowRight, Route, ShieldCheck, TrendingDown, Trash2, Plus, Minus, ExternalLink, MapPin } from 'lucide-react';
 import { useSupermarketStore } from '@/store/useSupermarketStore';
 import { optimizeCart } from '@/lib/api';
 
@@ -12,7 +12,7 @@ interface SmartCartOptimizerModalProps {
 }
 
 export const SmartCartOptimizerModal: React.FC<SmartCartOptimizerModalProps> = ({ isOpen, onClose }) => {
-  const { cartItems, updateQuantity, removeFromCart, userLocation } = useSupermarketStore();
+  const { cartItems, updateQuantity, removeFromCart, clearCart, userLocation } = useSupermarketStore();
   const [optimizationResult, setOptimizationResult] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'split' | 'single'>('split');
@@ -42,6 +42,28 @@ export const SmartCartOptimizerModal: React.FC<SmartCartOptimizerModalProps> = (
     }
   };
 
+  const handleOpenGoogleMaps = (suggestedRoute: any[]) => {
+    if (!suggestedRoute || suggestedRoute.length === 0) return;
+    const origin = `${userLocation.latitude},${userLocation.longitude}`;
+    const destination = encodeURIComponent(suggestedRoute[suggestedRoute.length - 1].address);
+    const waypoints = suggestedRoute
+      .slice(0, -1)
+      .map((s) => encodeURIComponent(s.address))
+      .join('|');
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${
+      waypoints ? `&waypoints=${waypoints}` : ''
+    }`;
+    window.open(url, '_blank');
+  };
+
+  const handleOpenSingleStoreMap = (address: string) => {
+    if (!address) return;
+    const origin = `${userLocation.latitude},${userLocation.longitude}`;
+    const destination = encodeURIComponent(address);
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn" role="dialog" aria-modal="true">
       <div className="w-full max-w-4xl glass-panel rounded-3xl border border-slate-700/80 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
@@ -65,9 +87,20 @@ export const SmartCartOptimizerModal: React.FC<SmartCartOptimizerModalProps> = (
         <div className="p-6 overflow-y-auto space-y-6 flex-1">
           {/* Cart Items List */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-              Productos en tu lista ({cartItems.length})
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Productos en tu lista ({cartItems.length})
+              </h3>
+              {cartItems.length > 0 && (
+                <button
+                  onClick={clearCart}
+                  className="text-[11px] text-slate-400 hover:text-rose-400 transition flex items-center gap-1 font-medium"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Vaciar lista
+                </button>
+              )}
+            </div>
 
             {cartItems.length === 0 ? (
               <div className="p-8 text-center glass-panel rounded-2xl border border-slate-800">
@@ -180,14 +213,25 @@ export const SmartCartOptimizerModal: React.FC<SmartCartOptimizerModalProps> = (
               {/* Tab 1: Split Store Suggested Route */}
               {activeTab === 'split' && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
                       <Route className="w-4 h-4 text-brand-400" />
                       Ruta Sugerida ({optimizationResult.optimizedSplitOption.suggestedRoute.length} paradas)
                     </h4>
-                    <span className="text-xs font-extrabold text-brand-400">
-                      Total: ${optimizationResult.optimizedSplitOption.totalCost.toLocaleString('es-AR')}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() =>
+                          handleOpenGoogleMaps(optimizationResult.optimizedSplitOption.suggestedRoute)
+                        }
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] text-brand-300 font-semibold border border-slate-700 transition shadow-sm"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Navegar con Google Maps
+                      </button>
+                      <span className="text-xs font-extrabold text-brand-400">
+                        Total: ${optimizationResult.optimizedSplitOption.totalCost.toLocaleString('es-AR')}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="space-y-3">
@@ -229,12 +273,21 @@ export const SmartCartOptimizerModal: React.FC<SmartCartOptimizerModalProps> = (
                 <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-3">
                   {optimizationResult.singleStoreOption ? (
                     <>
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <h4 className="text-sm font-bold text-slate-100">
                             {optimizationResult.singleStoreOption.supermarketName}
                           </h4>
                           <p className="text-xs text-slate-400">{optimizationResult.singleStoreOption.address}</p>
+                          <button
+                            onClick={() =>
+                              handleOpenSingleStoreMap(optimizationResult.singleStoreOption.address)
+                            }
+                            className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-brand-300 font-semibold border border-slate-700 transition"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            Cómo llegar en Google Maps
+                          </button>
                         </div>
                         <div className="text-right">
                           <span className="text-xs text-slate-400">Costo Total Mono-Tienda</span>

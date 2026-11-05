@@ -119,6 +119,7 @@ describe('SearchProductsWithPricesUseCase', () => {
 
     const leche = results.find((r) => r.productId === 'p1')!;
     expect(leche.storePricesCount).toBe(2);
+    expect(leche.storePrices).toHaveLength(2);
     expect(leche.bestDeal!.price).toBe(100); // ya vienen ordenados por precio asc
     expect(leche.priceRange.min).toBe(100);
     expect(leche.priceRange.max).toBe(120);

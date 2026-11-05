@@ -5,6 +5,21 @@ import { ProductEntity } from '../../infrastructure/persistence/entities/product
 import { BranchProductEntity } from '../../../pricing/infrastructure/persistence/entities/branch-product.entity';
 import { SearchProductQueryDto } from '../../presentation/http/dto/search-product-query.dto';
 
+export interface StorePriceDeal {
+  branchId: string;
+  supermarketName: string;
+  branchName: string;
+  address: string;
+  price: number;
+  /** Precio de lista (sin promocion). */
+  listPrice: number | null;
+  /** true cuando el precio mostrado es una promocion (listPrice > price). */
+  hasPromotion: boolean;
+  unitPrice: number;
+  distanceKm: number;
+  lastUpdated: Date;
+}
+
 export interface ProductSearchResult {
   productId: string;
   name: string;
@@ -14,20 +29,8 @@ export interface ProductSearchResult {
   imageUrl: string;
   measurementUnit: string;
   contentValue: number;
-  bestDeal: {
-    branchId: string;
-    supermarketName: string;
-    branchName: string;
-    address: string;
-    price: number;
-    /** Precio de lista (sin promocion). */
-    listPrice: number | null;
-    /** true cuando el precio mostrado es una promocion (listPrice > price). */
-    hasPromotion: boolean;
-    unitPrice: number;
-    distanceKm: number;
-    lastUpdated: Date;
-  } | null;
+  bestDeal: StorePriceDeal | null;
+  storePrices: StorePriceDeal[];
   storePricesCount: number;
   priceRange: {
     min: number;
@@ -140,18 +143,36 @@ export class SearchProductsWithPricesUseCase {
             measurementUnit: prod.measurementUnit,
             contentValue: parseFloat(prod.contentValue as any),
             bestDeal: null,
+            storePrices: [],
             storePricesCount: 0,
             priceRange: { min: 0, max: 0, average: 0 },
           };
         }
 
-        const prices = branchPrices.map((bp) => parseFloat(bp.currentPrice));
+        const mappedStorePrices: StorePriceDeal[] = branchPrices.map((bp) => {
+          const price = parseFloat(bp.currentPrice);
+          const listPrice = bp.listPrice === null || bp.listPrice === undefined ? null : parseFloat(bp.listPrice);
+          return {
+            branchId: bp.branchId,
+            supermarketName: bp.supermarketName,
+            branchName: bp.branchName,
+            address: bp.address,
+            price,
+            listPrice,
+            hasPromotion: listPrice !== null && listPrice > price,
+            unitPrice: parseFloat(bp.unitPrice),
+            distanceKm: Math.round((parseFloat(bp.distanceMeters) / 1000) * 100) / 100,
+            lastUpdated: bp.lastUpdatedAt,
+          };
+        });
+
+        const prices = mappedStorePrices.map((bp) => bp.price);
         const minPrice = Math.min(...prices);
         const maxPrice = Math.max(...prices);
         const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
 
         // El primer registro es el de menor precio (ORDER BY currentPrice ASC)
-        const bestDealRaw = branchPrices[0];
+        const bestDeal = mappedStorePrices[0] || null;
 
         return {
           productId: prod.id,
@@ -162,25 +183,9 @@ export class SearchProductsWithPricesUseCase {
           imageUrl: prod.imageUrl,
           measurementUnit: prod.measurementUnit,
           contentValue: parseFloat(prod.contentValue as any),
-          bestDeal: {
-            branchId: bestDealRaw.branchId,
-            supermarketName: bestDealRaw.supermarketName,
-            branchName: bestDealRaw.branchName,
-            address: bestDealRaw.address,
-            price: parseFloat(bestDealRaw.currentPrice),
-            listPrice:
-              bestDealRaw.listPrice === null || bestDealRaw.listPrice === undefined
-                ? null
-                : parseFloat(bestDealRaw.listPrice),
-            hasPromotion:
-              bestDealRaw.listPrice !== null &&
-              bestDealRaw.listPrice !== undefined &&
-              parseFloat(bestDealRaw.listPrice) > parseFloat(bestDealRaw.currentPrice),
-            unitPrice: parseFloat(bestDealRaw.unitPrice),
-            distanceKm: Math.round((parseFloat(bestDealRaw.distanceMeters) / 1000) * 100) / 100,
-            lastUpdated: bestDealRaw.lastUpdatedAt,
-          },
-          storePricesCount: branchPrices.length,
+          bestDeal,
+          storePrices: mappedStorePrices,
+          storePricesCount: mappedStorePrices.length,
           priceRange: {
             min: minPrice,
             max: maxPrice,

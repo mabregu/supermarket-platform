@@ -913,3 +913,165 @@ scripts/stop-postgres.cmd       # Detiene PostgreSQL portátil (idempotente)
 > Nota: el `docker-compose.dev.yml` no se pudo ejecutar en esta máquina porque Docker no está
 > instalado; queda listo para entornos con Docker.
 
+
+---
+
+# Séptima iteración — Deploy en frío, repo en GitHub, Supabase reseteado
+
+**Fecha:** 2026-10-30
+**Contexto:** Cerrar el ciclo de deploy del proyecto (Vercel + Render + Supabase) y dejar todo
+preparado para subirlo. Sesión recién retomada.
+
+## Objetivo
+
+- Configurar MCP de Supabase y autenticarlo.
+- Crear repo en GitHub y pushear el estado actual.
+- Resetear la base de datos del proyecto de Supabase.
+- Dejar listos los artefactos de deploy (render.yaml, Dockerfile, `DATABASE_URL`).
+
+## MCP de Supabase
+
+- `~/.config/opencode/opencode.json` actualizado con MCP remoto:
+  `https://mcp.supabase.com/mcp?project_ref=iwpchdoqkftffxcrmvio&features=docs,account,database,debugging,development,functions,branching`
+- Auth completada via browser (`opencode mcp auth supabase`).
+- Tools disponibles: `list_tables`, `execute_sql`, `apply_migration`, `get_project_url`,
+  `get_publishable_keys`, etc.
+
+## Repo GitHub
+
+- Repo creado: `mabregu/supermarket-platform`.
+- Remote: `https://github.com/mabregu/supermarket-platform.git`.
+- Push OK: branch `main` → `origin/main`. Commit: `40a05b2 chore: initial commit ...`.
+- `.gitignore` raíz cubre `.env`, `node_modules`, `dist`, `.next` → sin secrets versionados.
+
+## Reset de la base de Supabase
+
+- Proyecto: `iwpchdoqkftffxcrmvio` → `https://iwpchdoqkftffxcrmvio.supabase.co`.
+- Tablas previas (`profiles`, `products`, `product_prices`, `wishlists`) **no** del proyecto → reset.
+- SQL: `DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres, anon, authenticated, service_role;`
+- Verificado: `list_tables` → [] (base limpia).
+- `DATABASE_URL`: `postgresql://postgres:YYERyAqM9WH6RNM3@db.iwpchdoqkftffxcrmvio.supabase.co:5432/postgres`.
+
+## Pipeline contra Supabase (intentado, fallido por DNS)
+
+- Seed (`npm run seed`) con `DATABASE_URL=...` → `getaddrinfo ENOTFOUND db.iwpchdoqkftffxcrmvio.supabase.co`.
+- Ingesta (`npm run ingest:prices`) con `DATABASE_URL=...` → mismo error DNS.
+- Diagnóstico: fallo de red/DNS desde la sandbox hacia `*.supabase.co`; no es credencial. El MCP (server-side) sí llega.
+
+## Estado actual
+
+- Backend: ✅ tsc/eslint/jest 47-47/build.
+- Frontend: ✅ tsc/lint/build.
+- Deploy artifacts: ✅ render.yaml, backend/Dockerfile, backend/.dockerignore, db-config con `DATABASE_URL`.
+- Supabase: ✅ DB reseteada y limpia; `DATABASE_URL` lista.
+- GitHub: ✅ repo creado y pusheado.
+
+## Siguientes pasos
+
+1. Correr seed + ingest desde maquina local contra la `DATABASE_URL` de Supabase.
+2. Deploy: Render (backend) + Vercel (frontend).
+3. Actualizar `CORS_ORIGINS` con origin de Vercel.
+
+## Stack de deploy (resumen)
+
+- Frontend → Vercel (Hobby, gratis).
+- Backend → Render (Free).
+- DB → Supabase (Free, Postgres+PostGIS).
+- Total: USD 0/mes.
+
+---
+
+# Octava iteración — Deploy en frío, migración de base de datos a Neon
+
+**Fecha:** 2026-11-04
+**Contexto:** Cerrar el ciclo de deploy. Último intento contra Supabase fallaba en runtime
+(`Unable to connect to the database. Retrying (6)`); se identificó la causa raíz en el panel de
+Supabase y se decidió migrar la base de datos a **Neon**.
+
+## 1. Diagnóstico definitivo (Supabase → Neon)
+
+- El panel de Supabase indica: *"Direct connections use IPv6 by default — Enable the dedicated IPv4
+  address add-on to connect from IPv4-only networks."*
+- El add-on **Dedicated IPv4** es de **Pro Plan ($4/mes/database)** → no viable en plan gratuito.
+- El **shared pooler** acepta conexiones IPv4 por defecto → era el path correcto, pero el error AWS
+  ALB (`no tenant identifier provided`) persistía.
+- Conclusión: **migrar la DB a Neon** era la opción correcta.
+
+## 2. Setup de Neon
+
+- MCP de Neon cargado y configurado: CLI `8.17.1`, `neon login` OK, MCP instalado en OpenCode
+  (`opencode.json`), skills instalados (`neon`, `neon-postgres`, etc.).
+- Proyecto Neon encontrado: `mabregu` (`young-bar-40958993`), rama `main` (**ready**), Postgres 16.
+- DB: `quiosquito` → **vacía** → se le creó el schema y se sembró con datos reales de SEPA.
+
+## 3. Schema + datos en Neon
+
+- `DATABASE_URL` (Neon, pooler):
+  `postgresql://quiosquito_owner:***@ep-icy-leaf-a5b7dezi-pooler.us-east-2.aws.neon.tech/quiosquito?channel_binding=require&sslmode=require`
+- `npm run seed` → ✅ `3 productos, 11 sucursales (11 nuevas, 23 precios nuevos). Fuente: SEPA 2026-10-21`.
+- Tablas creadas: `supermarkets`, `store_branches`, `categories`, `brands`, `products`,
+  `branch_products`, `price_history` (+ PostGIS).
+
+## 4. Backend (Render) → LIVE
+
+- `DATABASE_URL` actualizada en Render → redeploy → status **`live`** (deployment
+  `dep-dblluumc6qcc73bkob10`, 2026-11-04T16:39:02Z). **Primera vez que el deploy no falló en runtime.**
+- API validada: `GET /api/v1/products/search?limit=2` → **200 OK** con datos reales de SEPA
+  (Aceite de Girasol Canuelas, Leche Casanto, etc.).
+
+## 5. Frontend (Vercel) → READY
+
+- Env var creada: `NEXT_PUBLIC_API_URL = https://supermarket-platform-jt71.onrender.com/api/v1`.
+- Redeploy de producción → `READY` (deployment `dpl_4esJk3du4uu7W5FvKD5qGGCBGxW3).
+- E2E validado: frontend responde y backend responde con datos.
+
+## 6. URLs finales del sistema
+
+- Frontend: `https://frontend-tan-chi-6ityrwozm2.vercel.app`
+- Backend API: `https://supermarket-platform-jt71.onrender.com/api/v1`
+- Swagger: `https://supermarket-platform-jt71.onrender.com/docs`
+
+## 7. Estado final
+
+- **Deploy completo y validado end-to-end con base de datos real (Neon + PostGIS + SEPA).**
+- Cierra el ciclo de deploy del proyecto.
+
+## Siguientes pasos (cerrar)
+
+1. Correr ingest de precios SEPA fresco (`npm run ingest:prices`) contra Neon.
+2. Eliminar la instancia Postgres de Render que quedó huérfana (`dpg-dbkuqj15efls73fo7dng-a`).
+
+---
+---
+
+# Novena iteración — Usabilidad UX, Mobile, Escáner de Código de Barras y Comparativa Multi-Tienda
+
+**Fecha:** 2026-11-04
+**Objetivo:** Elevar drásticamente la usabilidad, experiencia mobile y propuesta de valor de la plataforma con funcionalidades de alto impacto para el usuario cotidiano.
+
+## 1. Usabilidad Crítica y Performance
+- **Buscador Mobile:** En `Header.tsx` se añadió un input de búsqueda visible en smartphones con acceso directo a escaneo de códigos de barra.
+- **Debounce de Búsqueda:** Nuevo hook `useDebounce` (300 ms) en `page.tsx`. Evita saturar la base de datos de Neon/Render con peticiones por cada tecla y elimina parpadeos en pantalla.
+- **Corrección de Categorías:** Se alinearon los chips con las categorías reales de la plataforma (`Lácteos y Frescos`, `Almacén`, `Bebidas`, `Limpieza`, `Panadería`) y se agregó un toggle dedicado para promociones (`⚡ Solo Promociones`).
+- **Barra Flotante del Carrito:** Aparece automáticamente cuando hay productos en la lista, permitiendo al usuario ver el total de items y abrir el optimizador de rutas sin necesidad de scrollear arriba.
+
+## 2. Comparativa de Precios por Sucursal en Góndola
+- **Backend:** `SearchProductsWithPricesUseCase` ahora devuelve `storePrices: StorePriceDeal[]` con la lista de todas las sucursales ordenadas por precio y distancia.
+- **Frontend:** Cada `ProductCard` incluye un acordeón desplegable *"Comparar en X tiendas"* que muestra el desglose sucursal por sucursal con precio, si tiene promoción, precio lista tachado y distancia.
+- **Precio Unitario ($/L o $/kg):** Se resalta el precio por unidad normalizada para facilitar la comparación entre presentaciones y tamaños.
+
+## 3. Escáner Web de Código de Barras y Selector de Ubicación
+- **Escáner de Código de Barras (`BarcodeScannerModal.tsx`):** Utiliza la API nativa `BarcodeDetector` con acceso a la cámara del celular y retroalimentación háptica (vibración al detectar el código), con fallback manual a ingreso de EAN.
+- **Selector Manual de Ubicación (`LocationModal.tsx`):** Permite escribir una dirección o barrio usando OpenStreetMap/Nominatim, o seleccionar accesos rápidos (Punta Lara, Ensenada, La Plata Centro, CABA Obelisco, San Telmo).
+
+## 4. Navegación GPS en Ruta Optimizada
+- **Navegación Google Maps (`SmartCartOptimizerModal.tsx`):** Botón *"Navegar con Google Maps"* que genera el enlace directo con origen, waypoints intermedios y destino final hacia las sucursales calculadas.
+- **Gestión de Lista:** Botón *"Vaciar lista"* para reiniciar el carrito en un solo clic.
+
+## 5. Soporte PWA
+- Se agregó `frontend/public/manifest.json` y configuración de viewport y theme-color `#020617` en `layout.tsx` para permitir instalar la plataforma como aplicación en dispositivos móviles.
+
+## Verificación ejecutada
+- Backend: `tsc --noEmit` ✅, `eslint` ✅, `jest` ✅ (47/47 tests en verde).
+- Frontend: `tsc --noEmit` ✅, `next lint` ✅ (0 warnings, 0 errors).
+

@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { Tag, Plus, TrendingDown, Store, Check, History, TrendingUp, Loader2 } from 'lucide-react';
+import { Tag, Plus, TrendingDown, Store, Check, History, TrendingUp, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSupermarketStore } from '@/store/useSupermarketStore';
-import { fetchPriceHistory, PriceHistoryResponse } from '@/lib/api';
+import { fetchPriceHistory, PriceHistoryResponse, StorePriceDeal } from '@/lib/api';
 
 export interface ProductCardProps {
   product: {
@@ -17,17 +17,8 @@ export interface ProductCardProps {
     measurementUnit: string;
     contentValue: number;
     storePricesCount: number;
-    bestDeal: {
-      branchId: string;
-      supermarketName: string;
-      branchName: string;
-      address: string;
-      price: number;
-      listPrice?: number | null;
-      hasPromotion?: boolean;
-      unitPrice: number;
-      distanceKm: number;
-    } | null;
+    bestDeal: StorePriceDeal | null;
+    storePrices?: StorePriceDeal[];
     priceRange: {
       min: number;
       max: number;
@@ -39,9 +30,23 @@ export interface ProductCardProps {
 const formatARS = (value: number) =>
   `$${value.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
 
+const formatUnit = (unit: string) => {
+  switch (unit?.toUpperCase()) {
+    case 'LITER':
+      return 'L';
+    case 'KG':
+      return 'kg';
+    case 'GRAM':
+      return 'g';
+    default:
+      return 'u';
+  }
+};
+
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { cartItems, addToCart, userLocation } = useSupermarketStore();
   const [showHistory, setShowHistory] = useState(false);
+  const [showStorePrices, setShowStorePrices] = useState(false);
   const [history, setHistory] = useState<PriceHistoryResponse | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
@@ -118,15 +123,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
         {/* Price Box */}
         {product.bestDeal ? (
-          <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 mb-4">
+          <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 mb-3">
             <div className="flex items-baseline justify-between">
               <div>
                 <span className="text-xs text-slate-400">Desde</span>
                 <div className="text-2xl font-extrabold text-brand-400 tracking-tight">
                   {formatARS(product.bestDeal.price)}
                 </div>
+                {product.bestDeal.unitPrice && (
+                  <span className="text-[11px] font-semibold text-slate-400 block -mt-0.5">
+                    ({formatARS(product.bestDeal.unitPrice)}/{formatUnit(product.measurementUnit)})
+                  </span>
+                )}
                 {hasPromotion && product.bestDeal.listPrice && (
-                  <div className="text-[11px] text-emerald-400">
+                  <div className="text-[11px] text-emerald-400 mt-0.5">
                     precio lista {formatARS(product.bestDeal.listPrice)}
                   </div>
                 )}
@@ -148,8 +158,74 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             </div>
           </div>
         ) : (
-          <div className="p-3 rounded-xl bg-slate-950/50 text-center text-xs text-slate-400 mb-4">
+          <div className="p-3 rounded-xl bg-slate-950/50 text-center text-xs text-slate-400 mb-3">
             Sin datos de precios disponibles en la zona
+          </div>
+        )}
+
+        {/* Store prices breakdown drawer */}
+        {product.storePrices && product.storePrices.length > 1 && (
+          <div className="mb-2">
+            <button
+              onClick={() => setShowStorePrices(!showStorePrices)}
+              className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-[11px] font-medium text-slate-300 hover:text-brand-400 transition"
+            >
+              <span className="flex items-center gap-1.5">
+                <Store className="w-3.5 h-3.5 text-brand-400" />
+                Comparar en {product.storePrices.length} tiendas
+              </span>
+              {showStorePrices ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            {showStorePrices && (
+              <div className="mt-1.5 p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] space-y-1.5">
+                <div className="flex items-center justify-between text-[10px] uppercase font-bold text-slate-400 px-1 border-b border-slate-800/80 pb-1">
+                  <span>Supermercado</span>
+                  <span>Precio / Distancia</span>
+                </div>
+                <div className="space-y-1 max-h-36 overflow-y-auto">
+                  {product.storePrices.map((sp, idx) => (
+                    <div
+                      key={`${sp.branchId}-${idx}`}
+                      className={`flex items-center justify-between p-1.5 rounded-lg border ${
+                        idx === 0
+                          ? 'bg-emerald-500/10 border-emerald-500/30'
+                          : 'bg-slate-900/40 border-slate-800/50'
+                      }`}
+                    >
+                      <div className="min-w-0 pr-2">
+                        <div className="flex items-center gap-1">
+                          <span className="font-bold text-slate-200 truncate">{sp.supermarketName}</span>
+                          {idx === 0 && (
+                            <span className="text-[9px] font-extrabold text-emerald-400 bg-emerald-500/20 px-1 rounded">
+                              Mejor
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {sp.branchName} · {sp.distanceKm} km
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="font-extrabold text-slate-100">{formatARS(sp.price)}</span>
+                        {sp.hasPromotion && sp.listPrice && (
+                          <span className="text-[9px] text-slate-500 line-through block">
+                            {formatARS(sp.listPrice)}
+                          </span>
+                        )}
+                        <span className="text-[9px] text-slate-400 block">
+                          {formatARS(sp.unitPrice)}/{formatUnit(product.measurementUnit)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

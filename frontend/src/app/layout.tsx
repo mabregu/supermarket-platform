@@ -1,9 +1,23 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
   title: 'PreciosSmart | Comparador de Precios y Carrito Optimizado con IA',
-  description: 'Encuentra, compara y optimiza tus compras en supermercados cercanos en tiempo real usando inteligencia artificial y geolocalización PostGIS.',
+  description:
+    'Encuentra, compara y optimiza tus compras en supermercados cercanos en tiempo real usando inteligencia artificial y geolocalización PostGIS.',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'PreciosSmart',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#020617',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
